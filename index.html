@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Schaltterme auswerten</title>
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#f3f6f4; --card:#ffffff; --ink:#1b2a27; --muted:#5b6b67; --line:#c9d6d1;
+  --accent:#0f6b5c; --accent-ink:#ffffff; --sel:#dff0ea;
+  --ok:#1d7a3a; --ok-bg:#dcf2e1; --bad:#b3261e; --bad-bg:#fbe2df;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#121a18; --card:#1b2624; --ink:#e6efec; --muted:#9bb0aa; --line:#33443f;
+    --accent:#4fc3a8; --accent-ink:#0b1513; --sel:#244039;
+    --ok:#7fd99a; --ok-bg:#1d3a27; --bad:#ff9d94; --bad-bg:#432220;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121a18; --card:#1b2624; --ink:#e6efec; --muted:#9bb0aa; --line:#33443f;
+  --accent:#4fc3a8; --accent-ink:#0b1513; --sel:#244039;
+  --ok:#7fd99a; --ok-bg:#1d3a27; --bad:#ff9d94; --bad-bg:#432220;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;line-height:1.5}
+main{max-width:860px;margin:0 auto;padding:24px 16px 40px}
+h1{font-size:1.6rem;margin:0 0 6px}
+.lead{color:var(--muted);margin:0 0 18px}
+.mono{font-family:Consolas,"Courier New",monospace}
+details.rules{background:var(--card);border:2px solid var(--line);border-radius:10px;padding:10px 14px;margin-bottom:18px}
+details.rules summary{cursor:pointer;font-weight:600}
+details.rules ol,details.rules ul{margin:8px 0 0;padding-left:22px}
+.tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+button.tab{
+  font:inherit;font-weight:600;color:var(--accent);background:var(--card);
+  border:2px solid var(--line);border-radius:10px;padding:9px 16px;cursor:pointer;
+}
+button.tab:hover{border-color:var(--accent)}
+button.tab.active{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.given{background:var(--card);border:2px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+.given .term{font-size:1.5rem;font-weight:700}
+.given .vals{margin-top:4px;color:var(--muted)}
+.given .vals b{color:var(--ink)}
+table{width:100%;border-collapse:separate;border-spacing:0;background:var(--card);border:2px solid var(--line);border-radius:10px;overflow:hidden}
+th,td{text-align:left;padding:10px 12px;vertical-align:middle;border-bottom:1px solid var(--line)}
+th{background:var(--sel);font-size:.9rem}
+tr:last-child td{border-bottom:none}
+td.nr{width:4.5em;font-weight:700;color:var(--muted)}
+td.step{width:36%}
+.t{display:inline-flex;flex-wrap:wrap;gap:4px;align-items:center;font-family:Consolas,"Courier New",monospace;font-size:1.25rem;font-weight:700}
+.t span,.t button{min-width:1.4em;text-align:center;border-radius:7px;padding:1px 4px}
+.t .hl{background:var(--sel);outline:2px solid var(--accent)}
+.t .done{background:var(--ok-bg);outline:2px solid var(--ok)}
+.t button.op{
+  font:inherit;color:var(--accent);background:var(--card);border:2px solid var(--line);cursor:pointer;padding:0 8px;
+}
+.t button.op:hover{border-color:var(--accent)}
+.t button.op.sel{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.calc{font-family:Consolas,"Courier New",monospace;font-weight:700}
+.calc small{font-family:"Segoe UI",system-ui,sans-serif;font-weight:400;color:var(--muted)}
+.ask{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ask .lbl{font-size:.9rem;color:var(--muted);flex-basis:100%}
+button.val{
+  font-family:Consolas,"Courier New",monospace;font-size:1.25rem;font-weight:700;
+  min-width:2.4em;height:2.4em;border-radius:10px;cursor:pointer;
+  border:2px solid var(--line);background:var(--card);color:var(--accent);
+}
+button.val:hover{border-color:var(--accent)}
+button.val.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn{font:inherit;font-weight:600;border-radius:10px;padding:9px 18px;cursor:pointer;border:2px solid var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.btn.ghost{background:transparent;color:var(--accent)}
+.fb{flex-basis:100%;font-weight:600;font-size:.9rem;color:var(--bad);margin-top:2px}
+tr.final td{background:var(--ok-bg)}
+tr.final .calc{color:var(--ok);font-size:1.2rem}
+.actions{margin-top:18px}
+@media (max-width:620px){
+  table,tbody,tr,td{display:block;width:100%}
+  thead{display:none}
+  tr{padding:8px 4px;border-bottom:1px solid var(--line)}
+  tr:last-child{border-bottom:none}
+  td{border:none;padding:4px 10px}
+  td.nr{width:auto;padding-bottom:0;font-size:.85rem}
+  td.step{width:100%}
+}
+</style>
+</head>
+<body>
+<main>
+  <h1>Schaltterme auswerten</h1>
+  <p class="lead">Werte den Schaltterm Schritt für Schritt aus. Tippe im Term auf die Verknüpfung, die als Nächstes berechnet wird, wähle das Ergebnis und tippe auf „Prüfen“.</p>
+
+  <details class="rules" open>
+    <summary>Regeln zum Nachschlagen</summary>
+    <ol>
+      <li>Klammern zuerst (von innen nach außen)</li>
+      <li>NICHT (¬)</li>
+      <li>UND (∧)</li>
+      <li>ODER (∨)</li>
+    </ol>
+    <ul>
+      <li>¬ kehrt den Wert um: ¬0 = 1 und ¬1 = 0</li>
+      <li>∧ ergibt nur 1, wenn beide Werte 1 sind</li>
+      <li>∨ ergibt 1, wenn mindestens ein Wert 1 ist</li>
+    </ul>
+  </details>
+
+  <div class="tabs" id="tabs"></div>
+  <div class="given" id="given"></div>
+  <div id="tableBox"></div>
+  <div class="actions"><button class="btn ghost" data-act="reset">Aufgabe neu starten</button></div>
+</main>
+
+<script>
+/* ===== Einstellung für die Lehrkraft =====
+   Variablennamen hier ändern, z. B. ["x","y","z"].
+   Alternativ per Link: …?vars=x,y,z */
+let VARS = ["a","b","c"];
+try{
+  const q = new URLSearchParams(location.search).get("vars");
+  if(q){ const v = q.split(",").map(s=>s.trim()).filter(Boolean); if(v.length===3) VARS = v; }
+}catch(e){}
+
+// Terme mit a, b, c; vals = Belegung für a, b, c
+const tasks = [
+  {term:["a","∨","b","∧","¬","c"],                      vals:[0,1,1]},
+  {term:["(","a","∨","b",")","∧","¬","c"],              vals:[0,1,0]},
+  {term:["¬","(","a","∧","b",")","∨","c","∧","¬","b"],  vals:[1,1,1]}
+];
+const LET = "abc";
+const RULE = {"¬":"NICHT","∧":"UND","∨":"ODER"};
+const HINT = {
+  "¬":"NICHT kehrt den Wert um: ¬0 = 1 und ¬1 = 0.",
+  "∧":"UND ergibt nur dann 1, wenn beide Werte 1 sind.",
+  "∨":"ODER ergibt 1, wenn mindestens ein Wert 1 ist."
+};
+
+function init(t){
+  return t.term.map(s=>{
+    if(s==="("||s===")") return {k:"p",s};
+    if(s==="¬"||s==="∧"||s==="∨") return {k:"o",s};
+    return {k:"v",v:t.vals[LET.indexOf(s)]};
+  });
+}
+let S = tasks.map(t=>({tokens:init(t), rows:[], sel:null, res:null, fb:"", done:false}));
+let cur = 0;
+
+/* ---------- Auswertungslogik ---------- */
+const isV=(t)=>t&&t.k==="v";
+function analyze(tk){
+  const hasParen = tk.some(t=>t.k==="p");
+  const bounds = [];
+  if(hasParen){
+    for(let i=0;i<tk.length;i++) if(tk[i].s==="("){
+      let j=i+1; while(j<tk.length && tk[j].k!=="p") j++;
+      if(tk[j] && tk[j].s===")") bounds.push([i+1,j]);
+    }
+  } else bounds.push([0,tk.length]);
+  const ranges = bounds.map(([lo,hi])=>{
+    const nots=[],ands=[],ors=[];
+    for(let i=lo;i<hi;i++){
+      const t=tk[i]; if(t.k!=="o") continue;
+      if(t.s==="¬" && i+1<hi && isV(tk[i+1])) nots.push(i);
+      if(t.s!=="¬" && i-1>=lo && i+1<hi && isV(tk[i-1]) && isV(tk[i+1])) (t.s==="∧"?ands:ors).push(i);
+    }
+    return {lo,hi,nots,ands,ors,pick:nots.length?nots:ands.length?ands:ors};
+  });
+  const allowed = new Set(); ranges.forEach(r=>r.pick.forEach(i=>allowed.add(i)));
+  return {hasParen,ranges,allowed};
+}
+function reason(tk,idx){
+  const a = analyze(tk);
+  const r = a.ranges.find(r=>idx>=r.lo && idx<r.hi);
+  if(a.hasParen && !r) return "Nicht ganz: Rechne zuerst in den Klammern.";
+  const s = tk[idx].s;
+  if(r && r.nots.length && s!=="¬") return "Nicht ganz: NICHT (¬) wird vor UND und ODER berechnet.";
+  if(r && r.ands.length && s==="∨") return "Nicht ganz: UND (∧) wird vor ODER (∨) berechnet.";
+  return "Diese Verknüpfung kann jetzt noch nicht berechnet werden.";
+}
+function span(tk,idx){
+  const s=tk[idx].s;
+  if(s==="¬") return isV(tk[idx+1]) ? [idx,idx+1] : [idx,idx];
+  return (isV(tk[idx-1]) && isV(tk[idx+1])) ? [idx-1,idx+1] : [idx,idx];
+}
+
+function check(){
+  const st=S[cur], tk=st.tokens;
+  if(st.sel===null){ st.fb="Tippe zuerst im Term auf die Verknüpfung, die du berechnen möchtest."; return; }
+  if(st.res===null){ st.fb="Wähle noch das Ergebnis (0 oder 1)."; return; }
+  const a = analyze(tk);
+  if(!a.allowed.has(st.sel)){ st.fb = reason(tk,st.sel); return; }
+  const i=st.sel, s=tk[i].s;
+  const L = s==="¬" ? null : tk[i-1].v, R = tk[i+1].v;
+  const ok = s==="¬" ? 1-R : s==="∧" ? Math.min(L,R) : Math.max(L,R);
+  if(st.res!==ok){ st.fb = "Das Ergebnis stimmt nicht. " + HINT[s]; return; }
+  const [lo,hi] = span(tk,i);
+  const text = s==="¬" ? `¬${R} = ${ok}` : `${L} ${s} ${R} = ${ok}`;
+  const next = tk.slice(0,lo).concat([{k:"v",v:ok}], tk.slice(hi+1));
+  let paren = false;
+  for(let k=0;k<next.length-2;){
+    if(next[k].s==="(" && isV(next[k+1]) && next[k+2].s===")"){ next.splice(k,3,next[k+1]); paren=true; k=0; } else k++;
+  }
+  st.rows.push({tokens:tk, lo, hi, text, rule:RULE[s], paren});
+  st.tokens = next; st.sel=null; st.res=null; st.fb="";
+  if(next.length===1) st.done=true;
+}
+
+/* ---------- Darstellung ---------- */
+function termHTML(tk, o={}){
+  const hl = o.hl || [-1,-2];
+  return `<span class="t">` + tk.map((t,i)=>{
+    const cls = (i>=hl[0] && i<=hl[1]) ? (o.cls||"hl") : "";
+    const txt = t.k==="v" ? t.v : t.s;
+    if(o.active && t.k==="o")
+      return `<button type="button" class="op${o.sel===i?" sel":""}" data-act="op" data-i="${i}" aria-label="Verknüpfung ${RULE[t.s]}">${t.s}</button>`;
+    return `<span class="${cls}">${txt}</span>`;
+  }).join("") + `</span>`;
+}
+function origTerm(t){
+  return t.term.map(s=>{ const k=LET.indexOf(s); return k>=0 ? VARS[k] : s; }).join(" ");
+}
+
+function render(){
+  const t = tasks[cur], st = S[cur];
+  document.getElementById("tabs").innerHTML = tasks.map((_,i)=>
+    `<button type="button" class="tab${i===cur?" active":""}" data-act="tab" data-t="${i}">Aufgabe ${i+1}${S[i].done?" ✓":""}</button>`).join("");
+  document.getElementById("given").innerHTML =
+    `<div class="term mono">Q = ${origTerm(t)}</div>` +
+    `<div class="vals">Belegung: ` + VARS.map((v,k)=>`<b>${v} = ${t.vals[k]}</b>`).join(", ") + `</div>`;
+
+  let rows = `<tr><td class="nr">Start</td><td><span class="t"><span>${origTerm(t)}</span></span></td>
+    <td class="step"><span class="calc">Werte einsetzen</span></td></tr>`;
+  st.rows.forEach((r,i)=>{
+    rows += `<tr><td class="nr">Schritt ${i+1}</td><td>${termHTML(r.tokens,{hl:[r.lo,r.hi],cls:"done"})}</td>
+      <td class="step"><span class="calc">${r.text}</span> <small>(${r.rule}${r.paren?", Klammer aufgelöst":""})</small></td></tr>`;
+  });
+  if(!st.done){
+    let hl=[-1,-2];
+    if(st.sel!==null) hl = span(st.tokens,st.sel);
+    rows += `<tr><td class="nr">Schritt ${st.rows.length+1}</td>
+      <td>${termHTML(st.tokens,{active:true,sel:st.sel,hl})}</td>
+      <td class="step"><div class="ask"><span class="lbl">Ergebnis des Schritts:</span>
+        <button type="button" class="val${st.res===0?" on":""}" data-act="res" data-v="0">0</button>
+        <button type="button" class="val${st.res===1?" on":""}" data-act="res" data-v="1">1</button>
+        <button type="button" class="btn primary" data-act="check">Prüfen</button>
+        ${st.fb?`<div class="fb" role="alert">${st.fb}</div>`:""}</div></td></tr>`;
+  } else {
+    rows += `<tr class="final"><td class="nr">Ergebnis</td><td><span class="t"><span>${st.tokens[0].v}</span></span></td>
+      <td class="step"><span class="calc">Q = ${st.tokens[0].v}. Richtig gelöst!</span></td></tr>`;
+  }
+  document.getElementById("tableBox").innerHTML =
+    `<table><thead><tr><th>Schritt</th><th>Term</th><th>Rechenschritt</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+document.addEventListener("click", e=>{
+  const b = e.target.closest("[data-act]"); if(!b) return;
+  const st = S[cur], act = b.dataset.act;
+  if(act==="tab"){ cur = +b.dataset.t; }
+  else if(act==="op"){ st.sel = (st.sel===+b.dataset.i)?null:+b.dataset.i; st.fb=""; }
+  else if(act==="res"){ const v=+b.dataset.v; st.res = (st.res===v)?null:v; st.fb=""; }
+  else if(act==="check"){ check(); }
+  else if(act==="reset"){ S[cur] = {tokens:init(tasks[cur]), rows:[], sel:null, res:null, fb:"", done:false}; }
+  render();
+});
+
+render();
+</script>
+</body>
+</html>
